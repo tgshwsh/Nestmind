@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, NotebookPen, Trophy } from "lucide-react";
+import { BookOpen, CalendarDays, NotebookPen, Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 const tabs = [
   { href: "/calendar", label: "日历/日程", Icon: CalendarDays },
   { href: "/notes", label: "记事/日记", Icon: NotebookPen },
+  { href: "/resources", label: "资料库/资源", Icon: BookOpen },
   { href: "/me", label: "我的/里程碑", Icon: Trophy },
 ] as const;
 
@@ -24,7 +25,7 @@ export function BottomNav() {
       )}
       aria-label="Bottom navigation"
     >
-      <div className="grid grid-cols-3">
+      <div className="grid grid-cols-4">
         {tabs.map(({ href, label, Icon }) => {
           const active = pathname === href || pathname?.startsWith(href + "/");
           return (
