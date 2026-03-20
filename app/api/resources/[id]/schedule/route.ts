@@ -1,27 +1,25 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { executeResourceSchedulePlan } from "@/lib/server/resource-schedule-plan";
 
+type Ctx = { params: Promise<{ id: string }> };
+
 /**
- * POST /api/resources/schedule
- * Body: { resource_id, start_date, end_date, weekdays, start_time_slot?, end_time_slot? }
+ * POST /api/resources/:id/schedule
+ * Body: { start_date, end_date, weekdays, start_time_slot?, end_time_slot? }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest, context: Ctx) {
   try {
+    const { id } = await context.params;
     const body = (await request.json()) as {
-      resource_id?: string;
       start_date?: string;
       end_date?: string;
       weekdays?: number[];
       start_time_slot?: string;
       end_time_slot?: string;
     };
-    const resourceId = body.resource_id?.trim();
-    if (!resourceId) {
-      return NextResponse.json({ error: "missing resource_id" }, { status: 400 });
-    }
 
-    return executeResourceSchedulePlan(request.headers, resourceId, {
+    return executeResourceSchedulePlan(request.headers, id, {
       start_date: body.start_date ?? "",
       end_date: body.end_date ?? "",
       weekdays: body.weekdays ?? [],
