@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase/client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/calendar";
 
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -17,7 +15,10 @@ export default function AuthCallbackPage() {
     let cancelled = false;
 
     async function run() {
-      const code = searchParams.get("code");
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const params = new URLSearchParams(search);
+      const next = params.get("next") ?? "/calendar";
+      const code = params.get("code");
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -62,7 +63,7 @@ export default function AuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, next, router]);
+  }, [router]);
 
   return (
     <div className="flex min-h-dvh w-full items-center justify-center px-4">

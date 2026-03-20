@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 
 export default function BootstrapPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/calendar";
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,6 +15,10 @@ export default function BootstrapPage() {
     let cancelled = false;
 
     async function run() {
+      // Avoid useSearchParams() so production prerender won't fail.
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") ?? "/calendar";
+
       setLoading(true);
       setError(null);
 
@@ -38,7 +40,7 @@ export default function BootstrapPage() {
     return () => {
       cancelled = true;
     };
-  }, [next, router]);
+  }, [router]);
 
   return (
     <div className="mx-auto min-h-dvh w-full max-w-md px-4 py-10">

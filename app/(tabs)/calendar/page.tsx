@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { supabase } from "@/lib/supabase/client";
@@ -234,7 +233,6 @@ function keyLocalDay(y: number, m: number, d: number) {
 type Mode = "month" | "day";
 
 export default function CalendarPage() {
-  const searchParams = useSearchParams();
   const [today] = useState(() => new Date());
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -333,7 +331,8 @@ export default function CalendarPage() {
 
   useEffect(() => {
     // Support /calendar?date=YYYY-MM-DD deep link from milestones page
-    const dateParam = searchParams.get("date");
+    if (typeof window === "undefined") return;
+    const dateParam = new URLSearchParams(window.location.search).get("date");
     if (!dateParam) return;
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateParam);
     if (!m) return;
@@ -347,7 +346,7 @@ export default function CalendarPage() {
     setSelectedDate({ y, m: mo, d });
     setMode("day");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     // local schedules + notes + auth status

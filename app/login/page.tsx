@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useSearchParams } from "next/navigation";
 
 import { KeyRound, Mail } from "lucide-react";
 
@@ -10,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/calendar";
+  // Avoid useSearchParams() so production prerender won't fail.
+  const getNext = () => {
+    if (typeof window === "undefined") return "/calendar";
+    const params = new URLSearchParams(window.location.search);
+    return params.get("next") ?? "/calendar";
+  };
 
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
@@ -22,6 +25,8 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const next = getNext();
 
     const redirectTo =
       typeof window !== "undefined"
@@ -48,6 +53,7 @@ export default function LoginPage() {
 
   async function onAnonLogin() {
     setError(null);
+    const next = getNext();
     startAnonTransition(async () => {
       try {
         const { error } = await supabase.auth.signInAnonymously();
