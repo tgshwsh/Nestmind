@@ -358,12 +358,28 @@ export default function ResourcesPage() {
     setError(null);
     const name = newCategoryName.trim();
     if (!name) return;
-    if (!familyId) {
-      setError("缺少 family_id：请先在 /login 登录（匿名登录也可）");
-      return;
+    let fid = familyId;
+    if (!fid) {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setError("请先登录");
+        return;
+      }
+      const res = await fetch("/api/bootstrap", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = (await res.json()) as { ok?: boolean; family_id?: string; error?: string };
+      if (!json?.ok || !json.family_id) {
+        setError(json?.error ?? "初始化失败，请重试");
+        return;
+      }
+      fid = json.family_id;
+      setFamilyId(fid);
     }
     const { error } = await supabase.from("resource_categories").insert({
-      family_id: familyId,
+      family_id: fid,
       name,
     });
     if (error) {

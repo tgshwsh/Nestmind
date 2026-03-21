@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase/client";
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
-
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -15,34 +12,15 @@ export default function AuthCallbackPage() {
     let cancelled = false;
 
     async function run() {
-      const search = typeof window !== "undefined" ? window.location.search : "";
-      const params = new URLSearchParams(search);
-      const next = params.get("next") ?? "/calendar";
-      const code = params.get("code");
+      try {
+        const search =
+          typeof window !== "undefined" ? window.location.search : "";
+        const params = new URLSearchParams(search);
+        const next = params.get("next") ?? "/calendar";
+        const code = params.get("code");
 
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (cancelled) return;
-        if (error) {
-          setStatus("error");
-          setErrorMessage(error.message);
-          return;
-        }
-        setStatus("ok");
-        router.replace(`/bootstrap?next=${encodeURIComponent(next)}`);
-        return;
-      }
-
-      const hash = typeof window !== "undefined" ? window.location.hash : "";
-      if (hash) {
-        const params = new URLSearchParams(hash.replace(/^#/, ""));
-        const access_token = params.get("access_token");
-        const refresh_token = params.get("refresh_token");
-        if (access_token && refresh_token) {
-          const { error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (cancelled) return;
           if (error) {
             setStatus("error");
@@ -50,20 +28,51 @@ export default function AuthCallbackPage() {
             return;
           }
           setStatus("ok");
-          router.replace(`/bootstrap?next=${encodeURIComponent(next)}`);
+          const target = `/bootstrap?next=${encodeURIComponent(next)}`;
+          await new Promise((r) => setTimeout(r, 100));
+          if (cancelled) return;
+          window.location.href = target;
           return;
         }
-      }
 
-      setStatus("error");
-      setErrorMessage("缺少登录参数，请重新从邮箱点击链接");
+        const hash = typeof window !== "undefined" ? window.location.hash : "";
+        if (hash) {
+          const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+          const access_token = hashParams.get("access_token");
+          const refresh_token = hashParams.get("refresh_token");
+          if (access_token && refresh_token) {
+            const { error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+            if (cancelled) return;
+            if (error) {
+              setStatus("error");
+              setErrorMessage(error.message);
+              return;
+            }
+            setStatus("ok");
+            const target = `/bootstrap?next=${encodeURIComponent(next)}`;
+            await new Promise((r) => setTimeout(r, 100));
+            if (cancelled) return;
+            window.location.href = target;
+            return;
+          }
+        }
+
+        setStatus("error");
+        setErrorMessage("缺少登录参数，请重新从邮箱点击链接");
+      } catch (e) {
+        setStatus("error");
+        setErrorMessage(e instanceof Error ? e.message : "登录失败");
+      }
     }
 
     run();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   return (
     <div className="flex min-h-dvh w-full items-center justify-center px-4">
@@ -74,6 +83,12 @@ export default function AuthCallbackPage() {
             <div className="text-sm text-muted-foreground">
               正在验证登录链接
             </div>
+          </>
+        )}
+        {status === "ok" && (
+          <>
+            <div className="text-lg font-medium">登录成功</div>
+            <div className="text-sm text-muted-foreground">正在跳转…</div>
           </>
         )}
         {status === "error" && (

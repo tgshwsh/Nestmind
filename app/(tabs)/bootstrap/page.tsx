@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
 export default function BootstrapPage() {
@@ -18,11 +19,39 @@ export default function BootstrapPage() {
       // Avoid useSearchParams() so production prerender won't fail.
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") ?? "/calendar";
+      const inviteCode = params.get("code") ?? params.get("invite_code") ?? null;
 
       setLoading(true);
       setError(null);
 
-      const res = await fetch("/api/bootstrap", { method: "POST" });
+      // Retry getting session (magic link redirect may need a moment to persist session)
+      let token: string | undefined;
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const { data } = await supabase.auth.getSession();
+        token = data.session?.access_token;
+        if (token) break;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+      if (!token) {
+        setError("请先登录");
+        setLoading(false);
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+      };
+      const body =
+        inviteCode && inviteCode.trim()
+          ? JSON.stringify({ invite_code: inviteCode.trim() })
+          : undefined;
+      if (body) headers["Content-Type"] = "application/json";
+
+      const res = await fetch("/api/bootstrap", {
+        method: "POST",
+        headers,
+        body,
+      });
       const json = (await res.json()) as { ok?: boolean; error?: string };
 
       if (cancelled) return;
@@ -33,7 +62,7 @@ export default function BootstrapPage() {
         return;
       }
 
-      router.replace(next);
+      window.location.replace(next);
     }
 
     run();

@@ -178,10 +178,30 @@
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    /* 禁止 iOS 横竖屏切换时自动调整字体 */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
+  body {
+    @apply bg-background text-foreground;
+    /* 原生 app 感：减少橡皮筋滚动 */
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
+    /* 触摸滚动更顺滑 */
+    -webkit-overflow-scrolling: touch;
+    /* 禁止长按选中（可点击元素） */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 输入框至少 16px 避免 iOS 自动缩放 */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.app-body {
+  min-height: 100dvh;
 }

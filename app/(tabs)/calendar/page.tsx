@@ -206,8 +206,13 @@ function getMonthGridDates(year: number, month: number) {
   return dates;
 }
 
+function stripTz(iso: string) {
+  // Treat all stored datetimes as wall-clock local time regardless of any UTC marker
+  return iso.replace(/(Z|[+-]\d{2}:?\d{2})(\.\d+)?$/, "");
+}
+
 function formatTime(iso: string) {
-  const d = new Date(iso);
+  const d = new Date(stripTz(iso));
   return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -218,7 +223,7 @@ function formatLocalDateYYYYMMDD(y: number, m: number, d: number) {
 }
 
 function sameLocalDay(iso: string, y: number, m: number, d: number) {
-  const date = new Date(iso);
+  const date = new Date(stripTz(iso));
   return (
     date.getFullYear() === y &&
     date.getMonth() === m &&

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 type LocalMilestoneGoal = {
   id: string;
@@ -116,6 +117,11 @@ export default function MePage() {
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
     setGoals(readLocalGoals());
@@ -395,6 +401,57 @@ export default function MePage() {
     writeLocalGoals(updated);
   };
 
+  async function fetchInvite() {
+    setInviteLoading(true);
+    setInviteError(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) {
+        setInviteLoading(false);
+        return;
+      }
+      const res = await fetch("/api/family/invite", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        invite_code?: string;
+        invite_url?: string;
+        error?: string;
+      };
+      if (json.ok && json.invite_url) {
+        setInviteUrl(json.invite_url);
+        setInviteCode(json.invite_code ?? null);
+      } else {
+        setInviteError(json?.error ?? "获取邀请链接失败");
+      }
+    } catch (e) {
+      setInviteError(e instanceof Error ? e.message : "网络错误");
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  function copyInvite() {
+    if (!inviteUrl) return;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    });
+  }
+
+  useEffect(() => {
+    fetchInvite();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) fetchInvite();
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   const goalTitleById = useMemo(() => {
     const map = new Map<string, string>();
     goals.forEach((g) => map.set(g.id, g.title));
@@ -418,6 +475,51 @@ export default function MePage() {
 
   return (
     <main className="space-y-6">
+      <section className="rounded-2xl border border-border/70 bg-card p-4">
+        <div className="flex items-center gap-2">
+          <Users className="size-5 text-primary" strokeWidth={1.5} />
+          <span className="font-medium">邀请家人</span>
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">
+          分享邀请链接，让家人加入同一家庭，共同查看和管理宝宝的日程与成长记录。
+        </p>
+        {inviteLoading ? (
+          <p className="mt-3 text-sm text-muted-foreground">加载中…</p>
+        ) : inviteUrl ? (
+          <div className="mt-3 space-y-2">
+            {inviteCode ? (
+              <div className="rounded-xl bg-muted/50 px-3 py-2 font-mono text-sm">
+                {inviteCode}
+              </div>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyInvite}
+              className="w-full rounded-xl"
+            >
+              {inviteCopied ? "已复制" : "复制邀请链接"}
+            </Button>
+          </div>
+        ) : inviteError ? (
+          <div className="mt-3 space-y-2">
+            <p className="text-sm text-destructive">{inviteError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchInvite}
+              className="w-full rounded-xl"
+            >
+              重试
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            请先 <Link href="/login" className="underline">登录</Link> 后使用邀请功能。
+          </p>
+        )}
+      </section>
+
       <header className="space-y-2">
         <h1 className="font-display text-2xl font-semibold tracking-tight">
           我的 / 里程碑

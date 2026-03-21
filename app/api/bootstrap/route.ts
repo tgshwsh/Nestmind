@@ -10,6 +10,14 @@ export async function POST(request: Request) {
   try {
     const admin = createSupabaseAdminClient();
 
+    let inviteCode: string | null = null;
+    try {
+      const body = (await request.json()) as { invite_code?: string } | null;
+      inviteCode = body?.invite_code?.trim() || null;
+    } catch {
+      // No body or invalid JSON - continue with normal flow
+    }
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!url || !anonKey) {
@@ -50,21 +58,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, family_id: existing.family_id });
     }
 
-    // Create a new family
-    const { data: family, error: familyError } = await admin
-      .from("families")
-      .insert({ name: "我的家庭" })
-      .select("id")
-      .single();
+    let familyId: string;
 
-    if (familyError) {
-      return NextResponse.json({ error: familyError.message }, { status: 500 });
+    if (inviteCode) {
+      const { data: invitedFamily, error: inviteErr } = await admin
+        .from("families")
+        .select("id")
+        .eq("invite_code", inviteCode)
+        .maybeSingle();
+
+      if (inviteErr || !invitedFamily) {
+        return NextResponse.json(
+          { error: "邀请码无效或已过期" },
+          { status: 400 }
+        );
+      }
+      familyId = invitedFamily.id;
+    } else {
+      const { data: family, error: familyError } = await admin
+        .from("families")
+        .insert({ name: "我的家庭" })
+        .select("id")
+        .single();
+
+      if (familyError) {
+        return NextResponse.json({ error: familyError.message }, { status: 500 });
+      }
+      familyId = family.id;
     }
 
     // Upsert public.users
     const { error: upsertError } = await admin.from("users").upsert({
       id: user.id,
-      family_id: family.id,
+      family_id: familyId,
       role: "parent",
     });
 
@@ -72,7 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, family_id: family.id });
+    return NextResponse.json({ ok: true, family_id: familyId });
   } catch (e) {
     const message = e instanceof Error ? e.message : "bootstrap failed";
     return NextResponse.json({ error: message }, { status: 500 });

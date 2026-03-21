@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ArrowLeft, Calendar, FileText } from "lucide-react";
@@ -52,7 +52,6 @@ function formatDateOnly(iso: string): string {
 
 export default function ResourceDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string | undefined;
 
   const [resource, setResource] = useState<ResourceDetail | null>(null);
@@ -274,16 +273,15 @@ export default function ResourceDetailPage() {
 
   return (
     <main className="min-h-screen bg-detail-bg text-foreground">
-      <header className="sticky top-0 z-10 border-b border-detail-border bg-gradient-to-r from-detail-card to-detail-muted/60 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-detail-border bg-detail-card/95 backdrop-blur supports-[backdrop-filter]:bg-detail-card/80">
         <div className="flex items-center gap-2 px-4 py-3">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="flex items-center gap-1 rounded-xl px-2 py-1.5 text-sm text-detail-muted-foreground hover:bg-detail-muted/80"
+          <Link
+            href="/resources"
+            className="flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-medium text-detail-foreground active:scale-95 touch-manipulation"
           >
-            <ArrowLeft className="size-4" />
-            返回
-          </button>
+            <ArrowLeft className="size-4" strokeWidth={2} />
+            资料库
+          </Link>
         </div>
       </header>
 

@@ -47,12 +47,25 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
 
-    const familyId = profile?.family_id as string | null | undefined;
+    let familyId = profile?.family_id as string | null | undefined;
     if (!familyId) {
-      return NextResponse.json(
-        { error: "missing family_id (run bootstrap first)" },
-        { status: 400 }
-      );
+      const { data: family, error: familyError } = await admin
+        .from("families")
+        .insert({ name: "我的家庭" })
+        .select("id")
+        .single();
+      if (familyError) {
+        return NextResponse.json({ error: familyError.message }, { status: 500 });
+      }
+      const { error: upsertError } = await admin.from("users").upsert({
+        id: user.id,
+        family_id: family.id,
+        role: "parent",
+      });
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 });
+      }
+      familyId = family.id;
     }
 
     const body = (await request.json()) as Payload;
