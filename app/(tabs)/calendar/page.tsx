@@ -364,6 +364,50 @@ export default function CalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch notes from Supabase (cloud) + localStorage fallback
+  const fetchCloudNotes = async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      // Fetch a wide rolling window (±3 months from today)
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 3, 1)
+        .toISOString()
+        .slice(0, 10);
+      const to = new Date(now.getFullYear(), now.getMonth() + 4, 0)
+        .toISOString()
+        .slice(0, 10);
+      const res = await fetch(`/api/notes?from=${from}&to=${to}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        ok?: boolean;
+        items?: { id: string; note_date: string; content: string; tags: string[] }[];
+      };
+      if (!json.ok || !Array.isArray(json.items)) return;
+      // Group by date
+      const map = new Map<string, LocalNoteCard[]>();
+      for (const item of json.items) {
+        const date = item.note_date.slice(0, 10);
+        if (!map.has(date)) map.set(date, []);
+        map.get(date)!.push({
+          id: item.id,
+          content: item.content,
+          tags: item.tags ?? [],
+        });
+      }
+      const cloudNotes: LocalDayNotes[] = Array.from(map.entries()).map(
+        ([date, cards]) => ({ date, cards })
+      );
+      setNotes(cloudNotes);
+      writeLocalNotes(cloudNotes);
+    } catch {
+      // silently fall back to localStorage
+    }
+  };
+
   useEffect(() => {
     // local schedules + notes + auth status
     if (typeof window !== "undefined") {
@@ -376,7 +420,19 @@ export default function CalendarPage() {
     }
     supabase.auth.getSession().then(({ data }) => {
       setIsAuthed(!!data.session);
+      if (data.session) fetchCloudNotes();
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Refresh notes from cloud when app becomes visible
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchCloudNotes();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -702,12 +758,25 @@ export default function CalendarPage() {
     }
     setNotes(updated);
     writeLocalNotes(updated);
+    // Sync to cloud
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch("/api/notes/day", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ date: key, cards: cleaned }),
+      }).catch(() => { /* ignore network errors */ });
+    });
   };
 
   const handleAddCard = () => {
     const next = [
       ...noteCards,
-      { id: `card_${crypto.randomUUID()}`, content: "", tags: [] },
+      { id: crypto.randomUUID(), content: "", tags: [] },
     ];
     setNoteCards(next);
     // don't persist empty card yet; it will persist after typing/tagging
