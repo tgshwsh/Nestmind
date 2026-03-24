@@ -11,7 +11,6 @@ type LocalMilestoneGoal = {
   id: string;
   title: string;
   description?: string;
-  synced_milestone_id?: string | null;
 };
 
 const LOCAL_GOALS_KEY = "bt_local_milestone_goals_v1";
@@ -24,7 +23,6 @@ type LocalMilestoneRecord = {
   date: string; // YYYY-MM-DD
   goalId: string | null;
   content: string;
-  synced_record_id?: string | null;
 };
 
 type LocalSchedule = {
@@ -123,27 +121,65 @@ export default function MePage() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
+  // ---- Cloud fetch for milestones ----
+  async function fetchMilestonesFromCloud() {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/milestones", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        ok?: boolean;
+        goals?: { id: string; title: string; description?: string }[];
+        records?: {
+          id: string;
+          milestone_id: string | null;
+          record_date: string;
+          content: string;
+        }[];
+      };
+      if (!json.ok) return;
+      const cloudGoals: LocalMilestoneGoal[] = (json.goals ?? []).map((g) => ({
+        id: g.id,
+        title: g.title,
+        description: g.description ?? undefined,
+      }));
+      const cloudRecords: LocalMilestoneRecord[] = (json.records ?? []).map((r) => ({
+        id: r.id,
+        date: r.record_date.slice(0, 10),
+        goalId: r.milestone_id ?? null,
+        content: r.content,
+      }));
+      setGoals(cloudGoals);
+      setMilestones(cloudRecords);
+      writeLocalGoals(cloudGoals);
+      localStorage.setItem(LOCAL_MILESTONES_KEY, JSON.stringify(cloudRecords));
+    } catch { /* silently fail */ }
+  }
+
   useEffect(() => {
+    // Seed from localStorage immediately (instant UI)
     setGoals(readLocalGoals());
     setMilestones(readLocalMilestones());
-  }, []);
-
-  // 自动上传：有登录态时在后台执行一次同步，将本地未同步内容上传到云端
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (cancelled || !data.session?.access_token) return;
-      await syncSchedules();
-      if (cancelled) return;
-      await syncNotes();
-      if (cancelled) return;
-      await syncMilestones();
-    })();
-    return () => {
-      cancelled = true;
+    // Then refresh from cloud
+    fetchMilestonesFromCloud();
+    // Re-fetch on auth change
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => { if (session) fetchMilestonesFromCloud(); }
+    );
+    // Re-fetch when app comes back to foreground
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchMilestonesFromCloud();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function syncSchedules() {
@@ -290,115 +326,77 @@ export default function MePage() {
     }
   }
 
-  async function syncMilestones() {
-    setSyncMsg(null);
-    setSyncing(true);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      if (!token) {
-        setSyncMsg("未登录：请先到 /login 使用匿名登录（开发用）");
-        setSyncing(false);
-        return;
-      }
-
-      // Read local goals + records
-      const goals = readLocalGoals();
-      const records = readLocalMilestones();
-
-      const unsyncedGoals = goals.filter((g) => !g.synced_milestone_id);
-      const unsyncedRecords = records.filter((r) => !r.synced_record_id);
-
-      if (unsyncedGoals.length === 0 && unsyncedRecords.length === 0) {
-        setSyncMsg("没有需要同步的里程碑（本地都已同步）");
-        setSyncing(false);
-        return;
-      }
-
-      const payload = {
-        goals: unsyncedGoals.map((g) => ({
-          localGoalId: g.id,
-          title: g.title,
-        })),
-        records: unsyncedRecords.map((r) => ({
-          localRecordId: r.id,
-          date: r.date,
-          goalLocalId: r.goalId,
-          content: r.content,
-        })),
-      };
-
-      const res = await fetch("/api/sync/milestones", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const text = await res.text();
-      const json = text ? (JSON.parse(text) as any) : null;
-      if (!res.ok || !json?.ok) {
-        setSyncMsg(json?.error ?? "同步失败");
-        setSyncing(false);
-        return;
-      }
-
-      const goalMappings: { localGoalId: string; milestoneId: string }[] =
-        json.goalMappings ?? [];
-      const recordMappings: { localRecordId: string; recordId: string }[] =
-        json.recordMappings ?? [];
-
-      const goalMap = new Map(goalMappings.map((m) => [m.localGoalId, m.milestoneId]));
-      const recMap = new Map(recordMappings.map((m) => [m.localRecordId, m.recordId]));
-
-      // Update local storage objects with synced ids
-      const updatedGoals = goals.map((g) => {
-        const mid = goalMap.get(g.id);
-        return mid ? { ...g, synced_milestone_id: mid } : g;
-      });
-      writeLocalGoals(updatedGoals);
-      setGoals(updatedGoals);
-
-      const updatedRecords = records.map((r) => {
-        const rid = recMap.get(r.id);
-        return rid ? { ...r, synced_record_id: rid } : r;
-      });
-      localStorage.setItem(LOCAL_MILESTONES_KEY, JSON.stringify(updatedRecords));
-      setMilestones(updatedRecords);
-
-      setSyncMsg(
-        `已同步里程碑：目标 ${goalMappings.length} 个，记录 ${recordMappings.length} 条`
-      );
-      setSyncing(false);
-    } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : "同步失败");
-      setSyncing(false);
-    }
-  }
-
-  const handleAddGoal = (e: React.FormEvent) => {
+  const handleAddGoal = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) return;
-    const next: LocalMilestoneGoal = {
-      id: `goal_${crypto.randomUUID()}`,
-      title: trimmed,
-      description: description.trim() || undefined,
-    };
-    const updated = [...goals, next];
-    setGoals(updated);
-    writeLocalGoals(updated);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        const res = await fetch("/api/milestones/goals", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ title: trimmed, description: description.trim() || "" }),
+        });
+        const json = (await res.json()) as { ok?: boolean; goal?: LocalMilestoneGoal };
+        if (json.ok && json.goal) {
+          const updated = [...goals, json.goal];
+          setGoals(updated);
+          writeLocalGoals(updated);
+        }
+      } else {
+        // Offline fallback
+        const next: LocalMilestoneGoal = {
+          id: crypto.randomUUID(),
+          title: trimmed,
+          description: description.trim() || undefined,
+        };
+        const updated = [...goals, next];
+        setGoals(updated);
+        writeLocalGoals(updated);
+      }
+    } catch {
+      // Offline fallback
+      const next: LocalMilestoneGoal = {
+        id: crypto.randomUUID(),
+        title: trimmed,
+        description: description.trim() || undefined,
+      };
+      const updated = [...goals, next];
+      setGoals(updated);
+      writeLocalGoals(updated);
+    }
     setTitle("");
     setDescription("");
     setShowAddGoal(false);
   };
 
-  const handleDeleteGoal = (id: string) => {
+  const handleDeleteGoal = async (id: string) => {
+    // Optimistic local update
     const updated = goals.filter((g) => g.id !== id);
     setGoals(updated);
     writeLocalGoals(updated);
+    // Also remove associated records
+    setMilestones((prev) => {
+      const filtered = prev.filter((m) => m.goalId !== id);
+      localStorage.setItem(LOCAL_MILESTONES_KEY, JSON.stringify(filtered));
+      return filtered;
+    });
+    // Sync to cloud
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        await fetch(`/api/milestones/goals/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch { /* ignore */ }
   };
 
   async function fetchInvite() {

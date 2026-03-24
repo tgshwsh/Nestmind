@@ -420,15 +420,57 @@ export default function CalendarPage() {
     }
     supabase.auth.getSession().then(({ data }) => {
       setIsAuthed(!!data.session);
-      if (data.session) fetchCloudNotes();
+      if (data.session) {
+        fetchCloudNotes();
+        fetchCloudMilestones();
+      }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refresh notes from cloud when app becomes visible
+  // Fetch milestone goals and records from cloud
+  const fetchCloudMilestones = async () => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) return;
+      // Wide window: 6 months back, 6 months forward
+      const now = new Date();
+      const from = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().slice(0, 10);
+      const to   = new Date(now.getFullYear(), now.getMonth() + 7, 0).toISOString().slice(0, 10);
+      const res = await fetch(`/api/milestones?from=${from}&to=${to}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        ok?: boolean;
+        goals?: { id: string; title: string; description?: string }[];
+        records?: { id: string; milestone_id: string | null; record_date: string; content: string }[];
+      };
+      if (!json.ok) return;
+      const cloudGoals: LocalMilestoneGoal[] = (json.goals ?? []).map((g) => ({
+        id: g.id,
+        title: g.title,
+        description: g.description ?? undefined,
+      }));
+      const cloudRecords: LocalMilestoneRecord[] = (json.records ?? []).map((r) => ({
+        id: r.id,
+        date: r.record_date.slice(0, 10),
+        goalId: r.milestone_id ?? null,
+        content: r.content,
+      }));
+      setMilestoneGoals(cloudGoals);
+      setMilestones(cloudRecords);
+    } catch { /* silent */ }
+  };
+
+  // Refresh notes + milestones from cloud when app becomes visible
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") fetchCloudNotes();
+      if (document.visibilityState === "visible") {
+        fetchCloudNotes();
+        fetchCloudMilestones();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -554,17 +596,48 @@ export default function CalendarPage() {
     writeLocalMilestones(cleaned);
   };
 
-  const handleAddMilestone = () => {
+  const handleAddMilestone = async () => {
     if (!selectedDate) return;
     const dateStr = formatLocalDateYYYYMMDD(
       selectedDate.y,
       selectedDate.m,
       selectedDate.d
     );
+    const defaultGoalId = milestoneGoals[0]?.id ?? null;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (token) {
+        const res = await fetch("/api/milestones/records", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            record_date: dateStr,
+            milestone_id: defaultGoalId,
+            content: "",
+          }),
+        });
+        const json = (await res.json()) as {
+          ok?: boolean;
+          record?: { id: string; milestone_id: string | null; record_date: string; content: string };
+        };
+        if (json.ok && json.record) {
+          const next: LocalMilestoneRecord = {
+            id: json.record.id,
+            date: json.record.record_date.slice(0, 10),
+            goalId: json.record.milestone_id ?? null,
+            content: json.record.content,
+          };
+          setMilestones((prev) => [...prev, next]);
+          return;
+        }
+      }
+    } catch { /* offline fallback below */ }
+    // Offline fallback
     const next: LocalMilestoneRecord = {
-      id: `ms_${crypto.randomUUID()}`,
+      id: crypto.randomUUID(),
       date: dateStr,
-      goalId: milestoneGoals[0]?.id ?? null,
+      goalId: defaultGoalId,
       content: "",
     };
     const updated = [...milestones, next];
@@ -576,19 +649,49 @@ export default function CalendarPage() {
     const updated = milestones.map((m) => (m.id === id ? { ...m, content } : m));
     setMilestones(updated);
   };
+  const handleSaveMilestoneContent = (id: string, content: string) => {
+    writeLocalMilestones(milestones.map((m) => (m.id === id ? { ...m, content } : m)));
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch(`/api/milestones/records/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: content.trim() }),
+      }).catch(() => {});
+    });
+  };
 
   const handleUpdateMilestoneGoal = (id: string, goalId: string) => {
+    const newGoalId = goalId || null;
     const updated = milestones.map((m) =>
-      m.id === id ? { ...m, goalId: goalId ? goalId : null } : m
+      m.id === id ? { ...m, goalId: newGoalId } : m
     );
     setMilestones(updated);
     writeLocalMilestones(updated);
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch(`/api/milestones/records/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ milestone_id: newGoalId }),
+      }).catch(() => {});
+    });
   };
 
   const handleDeleteMilestone = (id: string) => {
     const updated = milestones.filter((m) => m.id !== id);
     setMilestones(updated);
     writeLocalMilestones(updated);
+    supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      fetch(`/api/milestones/records/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    });
   };
 
   const handlePrevMonth = () => {
@@ -1244,7 +1347,7 @@ export default function CalendarPage() {
                       onChange={(e) =>
                         handleUpdateMilestoneContent(m.id, e.target.value)
                       }
-                      onBlur={() => persistMilestones(milestones)}
+                      onBlur={(e) => handleSaveMilestoneContent(m.id, e.target.value)}
                       rows={2}
                       className="mt-2 w-full resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                       placeholder="记录今天在某个目标上的突破或关键节点…"
