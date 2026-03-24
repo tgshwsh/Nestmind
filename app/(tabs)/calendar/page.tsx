@@ -774,33 +774,34 @@ export default function CalendarPage() {
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">日期</label>
-                <input
-                  type="date"
-                  value={addDate}
-                  onChange={(e) => setAddDate(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">开始</label>
+            <div>
+              <label className="text-sm font-medium">日期</label>
+              <input
+                type="date"
+                value={addDate}
+                onChange={(e) => setAddDate(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                required
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 min-w-0">
+                <label className="text-sm font-medium">开始时间</label>
                 <input
                   type="time"
                   value={addStart}
                   onChange={(e) => setAddStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium">结束</label>
+              <span className="mb-2.5 shrink-0 text-sm text-muted-foreground">—</span>
+              <div className="flex-1 min-w-0">
+                <label className="text-sm font-medium">结束时间</label>
                 <input
                   type="time"
                   value={addEnd}
                   onChange={(e) => setAddEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </div>
             </div>
@@ -989,23 +990,24 @@ export default function CalendarPage() {
                 placeholder="例如：亲子阅读"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium">开始</label>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 min-w-0">
+                <label className="text-sm font-medium">开始时间</label>
                 <input
                   type="time"
                   value={dayStart}
                   onChange={(e) => setDayStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </div>
-              <div>
-                <label className="text-sm font-medium">结束</label>
+              <span className="mb-2.5 shrink-0 text-sm text-muted-foreground">—</span>
+              <div className="flex-1 min-w-0">
+                <label className="text-sm font-medium">结束时间</label>
                 <input
                   type="time"
                   value={dayEnd}
                   onChange={(e) => setDayEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                 />
               </div>
             </div>
