@@ -383,30 +383,27 @@ export default function ResourceDetailPage() {
                 ))}
               </div>
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1 min-w-0">
-                <label className="text-xs font-medium text-detail-muted-foreground">
-                  开始时间
-                </label>
-                <input
-                  type="time"
-                  value={planTimeStart}
-                  onChange={(e) => setPlanTimeStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
-                />
-              </div>
-              <span className="mb-2.5 shrink-0 text-xs text-detail-muted-foreground">—</span>
-              <div className="flex-1 min-w-0">
-                <label className="text-xs font-medium text-detail-muted-foreground">
-                  结束时间
-                </label>
-                <input
-                  type="time"
-                  value={planTimeEnd}
-                  onChange={(e) => setPlanTimeEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
-                />
-              </div>
+            <div>
+              <label className="text-xs font-medium text-detail-muted-foreground">
+                开始时间
+              </label>
+              <input
+                type="time"
+                value={planTimeStart}
+                onChange={(e) => setPlanTimeStart(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-detail-muted-foreground">
+                结束时间
+              </label>
+              <input
+                type="time"
+                value={planTimeEnd}
+                onChange={(e) => setPlanTimeEnd(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+              />
             </div>
             <button
               type="submit"

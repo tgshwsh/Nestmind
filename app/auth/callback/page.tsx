@@ -9,68 +9,87 @@ export default function AuthCallbackPage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
-    let cancelled = false;
+    let redirected = false;
 
-    async function run() {
-      try {
-        const search =
-          typeof window !== "undefined" ? window.location.search : "";
-        const params = new URLSearchParams(search);
-        const next = params.get("next") ?? "/calendar";
-        const code = params.get("code");
+    function doRedirect() {
+      if (redirected) return;
+      redirected = true;
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next") ?? "/calendar";
+      const code = params.get("code");
+      // Preserve invite code if present in original next param
+      const target = `/bootstrap?next=${encodeURIComponent(next)}${code ? "" : ""}`;
+      setStatus("ok");
+      setTimeout(() => {
+        window.location.replace(target);
+      }, 150);
+    }
 
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (cancelled) return;
-          if (error) {
-            setStatus("error");
-            setErrorMessage(error.message);
-            return;
-          }
-          setStatus("ok");
-          const target = `/bootstrap?next=${encodeURIComponent(next)}`;
-          await new Promise((r) => setTimeout(r, 100));
-          if (cancelled) return;
-          window.location.href = target;
-          return;
+    // 1. Listen for SIGNED_IN — works for both hash-flow (auto-processed by SDK)
+    //    and PKCE code-exchange flow.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
+          doRedirect();
         }
+      }
+    );
 
-        const hash = typeof window !== "undefined" ? window.location.hash : "";
-        if (hash) {
-          const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
-          const access_token = hashParams.get("access_token");
-          const refresh_token = hashParams.get("refresh_token");
-          if (access_token && refresh_token) {
-            const { error } = await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-            if (cancelled) return;
+    // 2. Check if already signed in (Supabase may have auto-processed the hash
+    //    before this component mounted).
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        doRedirect();
+        return;
+      }
+
+      // 3. Manually exchange PKCE code if present in URL.
+      const code = new URLSearchParams(window.location.search).get("code");
+      if (code) {
+        supabase.auth
+          .exchangeCodeForSession(code)
+          .then(({ error }) => {
             if (error) {
               setStatus("error");
               setErrorMessage(error.message);
-              return;
             }
-            setStatus("ok");
-            const target = `/bootstrap?next=${encodeURIComponent(next)}`;
-            await new Promise((r) => setTimeout(r, 100));
-            if (cancelled) return;
-            window.location.href = target;
-            return;
-          }
-        }
-
-        setStatus("error");
-        setErrorMessage("缺少登录参数，请重新从邮箱点击链接");
-      } catch (e) {
-        setStatus("error");
-        setErrorMessage(e instanceof Error ? e.message : "登录失败");
+            // onAuthStateChange SIGNED_IN will fire and call doRedirect
+          });
+        return;
       }
-    }
 
-    run();
+      // 4. Hash-based tokens (legacy implicit flow) — try setSession manually
+      //    in case the SDK didn't auto-process them.
+      const hash = window.location.hash;
+      if (hash) {
+        const hp = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = hp.get("access_token");
+        const refresh_token = hp.get("refresh_token");
+        if (access_token && refresh_token) {
+          supabase.auth
+            .setSession({ access_token, refresh_token })
+            .then(({ error }) => {
+              if (error) {
+                setStatus("error");
+                setErrorMessage(error.message);
+              }
+            });
+          return;
+        }
+      }
+
+      // 5. Nothing found — show error after a short wait in case SDK is still
+      //    processing asynchronously.
+      setTimeout(() => {
+        if (!redirected) {
+          setStatus("error");
+          setErrorMessage("缺少登录参数，请重新从邮箱点击链接");
+        }
+      }, 3000);
+    });
+
     return () => {
-      cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -80,9 +99,7 @@ export default function AuthCallbackPage() {
         {status === "loading" && (
           <>
             <div className="text-lg font-medium">正在登录，请稍候…</div>
-            <div className="text-sm text-muted-foreground">
-              正在验证登录链接
-            </div>
+            <div className="text-sm text-muted-foreground">正在验证登录链接</div>
           </>
         )}
         {status === "ok" && (

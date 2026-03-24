@@ -334,6 +334,17 @@ export default function CalendarPage() {
     fetchSchedules(year, month);
   }, [year, month, fetchSchedules]);
 
+  // Re-fetch when the user switches back to the app (e.g. from another device)
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        fetchSchedules(year, month);
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [year, month, fetchSchedules]);
+
   useEffect(() => {
     // Support /calendar?date=YYYY-MM-DD deep link from milestones page
     if (typeof window === "undefined") return;
@@ -784,26 +795,23 @@ export default function CalendarPage() {
                 required
               />
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1 min-w-0">
-                <label className="text-sm font-medium">开始时间</label>
-                <input
-                  type="time"
-                  value={addStart}
-                  onChange={(e) => setAddStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
-              </div>
-              <span className="mb-2.5 shrink-0 text-sm text-muted-foreground">—</span>
-              <div className="flex-1 min-w-0">
-                <label className="text-sm font-medium">结束时间</label>
-                <input
-                  type="time"
-                  value={addEnd}
-                  onChange={(e) => setAddEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
-              </div>
+            <div>
+              <label className="text-sm font-medium">开始时间</label>
+              <input
+                type="time"
+                value={addStart}
+                onChange={(e) => setAddStart(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">结束时间</label>
+              <input
+                type="time"
+                value={addEnd}
+                onChange={(e) => setAddEnd(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
             </div>
             <div className="flex gap-2">
               <Button
@@ -990,26 +998,23 @@ export default function CalendarPage() {
                 placeholder="例如：亲子阅读"
               />
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1 min-w-0">
-                <label className="text-sm font-medium">开始时间</label>
-                <input
-                  type="time"
-                  value={dayStart}
-                  onChange={(e) => setDayStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
-              </div>
-              <span className="mb-2.5 shrink-0 text-sm text-muted-foreground">—</span>
-              <div className="flex-1 min-w-0">
-                <label className="text-sm font-medium">结束时间</label>
-                <input
-                  type="time"
-                  value={dayEnd}
-                  onChange={(e) => setDayEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
-              </div>
+            <div>
+              <label className="text-sm font-medium">开始时间</label>
+              <input
+                type="time"
+                value={dayStart}
+                onChange={(e) => setDayStart(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">结束时间</label>
+              <input
+                type="time"
+                value={dayEnd}
+                onChange={(e) => setDayEnd(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
             </div>
             <Button type="submit" className="w-full rounded-2xl" disabled={daySubmitting}>
               {daySubmitting ? "保存中…" : "保存日程"}

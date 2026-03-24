@@ -182,25 +182,19 @@
   }
   html {
     @apply font-sans;
-    height: 100%;
     /* 禁止 iOS 横竖屏切换时自动调整字体 */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground;
-    height: 100%;
-    /* 禁止整页橡皮筋滚动，保留内部滚动容器的滚动 */
+    /* 防止整页橡皮筋滚动（iOS Safari 不再上拉/下拉触发 bounce） */
     overscroll-behavior-y: none;
     overscroll-behavior-x: none;
     /* 触摸滚动更顺滑 */
     -webkit-overflow-scrolling: touch;
     /* 禁止点击高亮 */
     -webkit-tap-highlight-color: transparent;
-    /* 防止 iOS Safari 底部工具栏导致 100vh 计算偏差 */
-    position: fixed;
-    width: 100%;
-    overflow: hidden;
   }
   /* 输入框至少 16px 避免 iOS 自动缩放 */
   input,
@@ -211,8 +205,5 @@
 }
 
 .app-body {
-  height: 100%;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
+  min-height: 100dvh;
 }
