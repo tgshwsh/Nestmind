@@ -115,6 +115,7 @@ export default function MePage() {
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [milestoneError, setMilestoneError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -140,8 +141,13 @@ export default function MePage() {
           record_date: string;
           content: string;
         }[];
+        error?: string;
       };
-      if (!json.ok) return;
+      if (!json.ok) {
+        setMilestoneError((json as any)?.error ?? "云端加载失败，请确认已在 Supabase 执行建表 SQL");
+        return;
+      }
+      setMilestoneError(null);
       const cloudGoals: LocalMilestoneGoal[] = (json.goals ?? []).map((g) => ({
         id: g.id,
         title: g.title,
@@ -527,6 +533,12 @@ export default function MePage() {
           日视图里的里程碑记录可以关联到这些目标。
         </p>
       </header>
+
+      {milestoneError ? (
+        <section className="rounded-2xl border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300">
+          ⚠️ {milestoneError}
+        </section>
+      ) : null}
 
       <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
         <div className="flex items-center justify-between gap-2">

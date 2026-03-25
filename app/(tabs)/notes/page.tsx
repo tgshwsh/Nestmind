@@ -41,6 +41,7 @@ export default function NotesPage() {
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [loading, setLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   async function fetchNotes() {
     // Start with local cache
@@ -63,13 +64,24 @@ export default function NotesPage() {
       const res = await fetch(`/api/notes?from=${from}&to=${to}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) { setLoading(false); return; }
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        setSyncError(`云端加载失败(${res.status})：${err || "请确认已在 Supabase 执行建表 SQL"}`);
+        setLoading(false);
+        return;
+      }
 
       const json = (await res.json()) as {
         ok?: boolean;
         items?: { id: string; note_date: string; content: string; tags: string[] }[];
+        error?: string;
       };
-      if (!json.ok || !Array.isArray(json.items)) { setLoading(false); return; }
+      if (!json.ok || !Array.isArray(json.items)) {
+        setSyncError(json?.error ?? "云端加载失败，请确认已在 Supabase 执行建表 SQL");
+        setLoading(false);
+        return;
+      }
+      setSyncError(null);
 
       // Group by date
       const map = new Map<string, LocalNoteCard[]>();
@@ -184,6 +196,12 @@ export default function NotesPage() {
           这里会自动展示你在日历日视图里创建的「小记事卡片」。
         </p>
       </header>
+
+      {syncError ? (
+        <section className="rounded-2xl border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-300">
+          ⚠️ {syncError}
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-border/70 bg-card p-4">
         <div className="text-sm font-medium">按标签筛选</div>

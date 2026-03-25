@@ -8,7 +8,7 @@ type CardInput = { id: string; content: string; tags: string[] };
 
 /**
  * PUT /api/notes/day
- * Replace all note cards for one calendar day (idempotent upsert + delete stale).
+ * Replace all note cards for one calendar day.
  * Body: { date: "YYYY-MM-DD", cards: CardInput[] }
  */
 export async function PUT(request: Request) {
@@ -27,12 +27,10 @@ export async function PUT(request: Request) {
 
     const admin = createSupabaseAdminClient();
     const { data: profile } = await admin
-      .from("users")
-      .select("family_id")
-      .eq("id", user.id)
-      .maybeSingle();
+      .from("users").select("family_id").eq("id", user.id).maybeSingle();
     if (!profile?.family_id)
       return NextResponse.json({ error: "no family" }, { status: 400 });
+    const familyId = profile.family_id as string;
 
     const body = (await request.json()) as { date?: string; cards?: CardInput[] };
     const date = body.date?.trim();
@@ -42,29 +40,29 @@ export async function PUT(request: Request) {
     const validCards = cards.filter(
       (c) => c.id && (c.content.trim() || c.tags.length > 0)
     );
+    const keepIds = new Set(validCards.map((c) => c.id));
 
-    // Delete all existing notes for this family + date that are NOT in the new list
-    const keepIds = validCards.map((c) => c.id);
-    if (keepIds.length > 0) {
-      await admin
-        .from("day_notes")
-        .delete()
-        .eq("family_id", profile.family_id)
-        .eq("note_date", date)
-        .not("id", "in", `(${keepIds.join(",")})`);
-    } else {
-      // No cards left — delete everything for this day
-      await admin
-        .from("day_notes")
-        .delete()
-        .eq("family_id", profile.family_id)
-        .eq("note_date", date);
+    // 1. Fetch existing IDs for this family + date
+    const { data: existing } = await admin
+      .from("day_notes")
+      .select("id")
+      .eq("family_id", familyId)
+      .eq("note_date", date);
+
+    // 2. Delete any that are no longer in the new card list
+    const toDelete = (existing ?? [])
+      .map((r) => r.id as string)
+      .filter((id) => !keepIds.has(id));
+
+    if (toDelete.length > 0) {
+      await admin.from("day_notes").delete().in("id", toDelete);
     }
 
+    // 3. Upsert remaining/new cards
     if (validCards.length > 0) {
       const rows = validCards.map((c) => ({
         id: c.id,
-        family_id: profile.family_id,
+        family_id: familyId,
         note_date: date,
         content: c.content.trim(),
         tags: c.tags.map((t) => t.trim()).filter(Boolean),

@@ -17,7 +17,7 @@ async function getAuthedFamily(request: Request) {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
     .from("users").select("family_id").eq("id", user.id).maybeSingle();
-  return profile?.family_id ? { user, admin, familyId: profile.family_id as string } : null;
+  return profile?.family_id ? { admin, familyId: profile.family_id as string } : null;
 }
 
 /** GET /api/milestones?from=YYYY-MM-DD&to=YYYY-MM-DD */
@@ -31,15 +31,29 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    // Goals (all, no date filter)
-    const { data: goals, error: ge } = await admin
+    // Goals — try selecting description (added by migration), fall back without
+    let goals: { id: string; title: string; description?: string }[] = [];
+    const { data: goalsWithDesc, error: ge1 } = await admin
       .from("milestones")
       .select("id, title, description")
       .eq("family_id", familyId)
       .order("created_at", { ascending: true });
-    if (ge) return NextResponse.json({ error: ge.message }, { status: 500 });
 
-    // Records (with optional date range)
+    if (ge1) {
+      // description column may not exist yet — retry without it
+      const { data: goalsBasic, error: ge2 } = await admin
+        .from("milestones")
+        .select("id, title")
+        .eq("family_id", familyId)
+        .order("created_at", { ascending: true });
+      if (ge2) return NextResponse.json({ error: ge2.message }, { status: 500 });
+      goals = goalsBasic ?? [];
+    } else {
+      goals = goalsWithDesc ?? [];
+    }
+
+    // Records — milestone_records table (created by migration)
+    let records: { id: string; milestone_id: string | null; record_date: string; content: string }[] = [];
     let rq = admin
       .from("milestone_records")
       .select("id, milestone_id, record_date, content")
@@ -48,10 +62,11 @@ export async function GET(request: NextRequest) {
     if (from) rq = rq.gte("record_date", from);
     if (to) rq = rq.lte("record_date", to);
 
-    const { data: records, error: re } = await rq;
-    if (re) return NextResponse.json({ error: re.message }, { status: 500 });
+    const { data: recs, error: re } = await rq;
+    // If table doesn't exist yet, return empty records rather than erroring out
+    if (!re) records = recs ?? [];
 
-    return NextResponse.json({ ok: true, goals: goals ?? [], records: records ?? [] });
+    return NextResponse.json({ ok: true, goals, records });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

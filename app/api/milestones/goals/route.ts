@@ -17,7 +17,7 @@ async function getAuthedFamily(request: Request) {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await admin
     .from("users").select("family_id").eq("id", user.id).maybeSingle();
-  return profile?.family_id ? { user, admin, familyId: profile.family_id as string } : null;
+  return profile?.family_id ? { admin, familyId: profile.family_id as string } : null;
 }
 
 /** PUT /api/milestones/goals  — create or update a goal */
@@ -25,45 +25,50 @@ export async function PUT(request: Request) {
   try {
     const ctx = await getAuthedFamily(request);
     if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    const { user, admin, familyId } = ctx;
+    const { admin, familyId } = ctx;
 
     const body = (await request.json()) as {
       id?: string; title?: string; description?: string;
     };
     const title = body.title?.trim();
     if (!title) return NextResponse.json({ error: "title required" }, { status: 400 });
+    const description = body.description?.trim() ?? "";
 
-    let goal: { id: string; title: string; description: string };
     if (body.id) {
-      // Update existing
-      const { data, error } = await admin
+      // Update — try with description, fall back without
+      let data: { id: string; title: string } | null = null;
+      let error: { message: string } | null = null;
+      ({ data, error } = await admin
         .from("milestones")
-        .update({ title, description: body.description?.trim() ?? "" })
+        .update({ title, description })
         .eq("id", body.id)
         .eq("family_id", familyId)
-        .select("id, title, description")
-        .single();
+        .select("id, title")
+        .single() as any);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      goal = data;
-    } else {
-      // Create new
-      const { data, error } = await admin
-        .from("milestones")
-        .insert({
-          family_id: familyId,
-          title,
-          description: body.description?.trim() ?? "",
-          expected_month: null,
-          is_achieved: false,
-          achieved_date: null,
-          created_by: user.id,
-        })
-        .select("id, title, description")
-        .single();
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      goal = data;
+      return NextResponse.json({ ok: true, goal: { ...data, description } });
     }
-    return NextResponse.json({ ok: true, goal });
+
+    // Create — do NOT include created_by (not in original schema)
+    // Try with description first (needs SQL migration), fall back without
+    let insertData: { id: string; title: string } | null = null;
+    let insertError: { message: string } | null = null;
+    ({ data: insertData, error: insertError } = await admin
+      .from("milestones")
+      .insert({ family_id: familyId, title, description, expected_month: null, is_achieved: false, achieved_date: null })
+      .select("id, title")
+      .single() as any);
+
+    if (insertError) {
+      // Retry without description (column may not exist)
+      ({ data: insertData, error: insertError } = await admin
+        .from("milestones")
+        .insert({ family_id: familyId, title, expected_month: null, is_achieved: false, achieved_date: null })
+        .select("id, title")
+        .single() as any);
+    }
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+    return NextResponse.json({ ok: true, goal: { ...insertData, description } });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
