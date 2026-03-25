@@ -337,27 +337,29 @@ export default function ResourceDetailPage() {
             按起止日期和每周频次，自动在日历中创建日程
           </p>
           <form onSubmit={submitPlan} className="mt-4 space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-medium text-detail-muted-foreground">
-                  开始日期
-                </label>
+            <div>
+              <label className="text-xs font-medium text-detail-muted-foreground">
+                开始日期
+              </label>
+              <div className="mt-1 min-w-0 overflow-hidden">
                 <input
                   type="date"
                   value={planStart}
                   onChange={(e) => setPlanStart(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+                  className="w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
                 />
               </div>
-              <div>
-                <label className="text-xs font-medium text-detail-muted-foreground">
-                  结束日期
-                </label>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-detail-muted-foreground">
+                结束日期
+              </label>
+              <div className="mt-1 min-w-0 overflow-hidden">
                 <input
                   type="date"
                   value={planEnd}
                   onChange={(e) => setPlanEnd(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+                  className="w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
                 />
               </div>
             </div>
@@ -365,17 +367,17 @@ export default function ResourceDetailPage() {
               <label className="text-xs font-medium text-detail-muted-foreground">
                 每周执行日
               </label>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 grid grid-cols-7 gap-1">
                 {WEEKDAY_LABELS.map((label, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => toggleWeekday(i)}
                     className={cn(
-                      "rounded-xl px-3 py-1.5 text-xs font-medium transition-colors",
+                      "rounded-lg py-1.5 text-xs font-medium transition-colors",
                       planWeekdays.includes(i)
                         ? "bg-secondary text-secondary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        : "bg-muted text-muted-foreground"
                     )}
                   >
                     {label}
@@ -387,23 +389,27 @@ export default function ResourceDetailPage() {
               <label className="text-xs font-medium text-detail-muted-foreground">
                 开始时间
               </label>
-              <input
-                type="time"
-                value={planTimeStart}
-                onChange={(e) => setPlanTimeStart(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
-              />
+              <div className="mt-1 min-w-0 overflow-hidden">
+                <input
+                  type="time"
+                  value={planTimeStart}
+                  onChange={(e) => setPlanTimeStart(e.target.value)}
+                  className="w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+                />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-detail-muted-foreground">
                 结束时间
               </label>
-              <input
-                type="time"
-                value={planTimeEnd}
-                onChange={(e) => setPlanTimeEnd(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
-              />
+              <div className="mt-1 min-w-0 overflow-hidden">
+                <input
+                  type="time"
+                  value={planTimeEnd}
+                  onChange={(e) => setPlanTimeEnd(e.target.value)}
+                  className="w-full rounded-xl border border-detail-border bg-detail-bg px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-detail-primary/40"
+                />
+              </div>
             </div>
             <button
               type="submit"
