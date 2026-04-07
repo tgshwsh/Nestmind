@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { ArrowLeft, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, Calendar, FileText, Trash2 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,8 @@ export default function ResourceDetailPage() {
   const [planTimeEnd, setPlanTimeEnd] = useState("09:30");
   const [planSubmitting, setPlanSubmitting] = useState(false);
   const [planMessage, setPlanMessage] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!id) return;
@@ -186,6 +188,30 @@ export default function ResourceDetailPage() {
     };
   }, [id]);
 
+  async function deleteResource() {
+    if (!id || !window.confirm("确认删除这个资源吗？此操作不可撤销。")) return;
+    setDeleting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) { setPlanMessage("未登录"); setDeleting(false); return; }
+      const res = await fetch(`/api/resources/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPlanMessage(json.error ?? "删除失败");
+        setDeleting(false);
+        return;
+      }
+      router.replace("/resources");
+    } catch (err) {
+      setPlanMessage(err instanceof Error ? err.message : "删除失败");
+      setDeleting(false);
+    }
+  }
+
   async function submitPlan(e: React.FormEvent) {
     e.preventDefault();
     if (!id) return;
@@ -274,7 +300,7 @@ export default function ResourceDetailPage() {
   return (
     <main className="min-h-screen bg-detail-bg text-foreground">
       <header className="sticky top-0 z-10 border-b border-detail-border bg-detail-card/95 backdrop-blur supports-[backdrop-filter]:bg-detail-card/80">
-        <div className="flex items-center gap-2 px-4 py-3">
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
           <Link
             href="/resources"
             className="flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-sm font-medium text-detail-foreground active:scale-95 touch-manipulation"
@@ -282,6 +308,15 @@ export default function ResourceDetailPage() {
             <ArrowLeft className="size-4" strokeWidth={2} />
             资料库
           </Link>
+          <button
+            type="button"
+            onClick={deleteResource}
+            disabled={deleting}
+            className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm font-medium text-destructive/80 hover:bg-destructive/10 active:scale-95 touch-manipulation disabled:opacity-40"
+          >
+            <Trash2 className="size-4" />
+            {deleting ? "删除中…" : "删除"}
+          </button>
         </div>
       </header>
 

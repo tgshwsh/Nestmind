@@ -358,40 +358,39 @@ export default function ResourcesPage() {
     setError(null);
     const name = newCategoryName.trim();
     if (!name) return;
-    let fid = familyId;
-    if (!fid) {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) {
-        setError("请先登录");
-        return;
-      }
-      const res = await fetch("/api/bootstrap", {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setError("请先登录"); return; }
+
+    // Bootstrap first if no family yet
+    if (!familyId) {
+      const bRes = await fetch("/api/bootstrap", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const json = (await res.json()) as { ok?: boolean; family_id?: string; error?: string };
-      if (!json?.ok || !json.family_id) {
-        setError(json?.error ?? "初始化失败，请重试");
+      const bJson = (await bRes.json()) as { ok?: boolean; family_id?: string; error?: string };
+      if (!bJson?.ok || !bJson.family_id) {
+        setError(bJson?.error ?? "初始化失败，请重试");
         return;
       }
-      fid = json.family_id;
-      setFamilyId(fid);
+      setFamilyId(bJson.family_id);
     }
-    const { error } = await supabase.from("resource_categories").insert({
-      family_id: fid,
-      name,
+
+    // Use API route (admin client) to bypass RLS
+    const res = await fetch("/api/resources/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name }),
     });
-    if (error) {
-      setError(error.message);
+    const json = (await res.json()) as { ok?: boolean; category?: Category; error?: string };
+    if (!json?.ok) {
+      setError(json?.error ?? "添加学科失败");
       return;
     }
     setNewCategoryName("");
-    const { data: cats } = await supabase
-      .from("resource_categories")
-      .select("id,name")
-      .order("name", { ascending: true });
-    setCategories((cats as Category[]) ?? []);
+    if (json.category) {
+      setCategories((prev) => [...prev, json.category!].sort((a, b) => a.name.localeCompare(b.name)));
+    }
   }
 
   async function addLevel() {
