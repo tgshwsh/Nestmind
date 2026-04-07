@@ -58,6 +58,7 @@ export default function ResourcesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newLevelName, setNewLevelName] = useState("");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -384,9 +385,10 @@ export default function ResourcesPage() {
     });
     const json = (await res.json()) as { ok?: boolean; category?: Category; error?: string };
     if (!json?.ok) {
-      setError(json?.error ?? "添加学科失败");
+      setCategoryError(json?.error ?? "添加学科失败");
       return;
     }
+    setCategoryError(null);
     setNewCategoryName("");
     if (json.category) {
       setCategories((prev) => [...prev, json.category!].sort((a, b) => a.name.localeCompare(b.name)));
@@ -524,27 +526,26 @@ export default function ResourcesPage() {
                   ))}
                 </select>
 
-                {categories.length === 0 ? (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs text-muted-foreground">
-                      还没有学科。先新增一个学科后再选 level。
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="h-9 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                        placeholder="例如：英语"
-                      />
-                      <button
-                        type="button"
-                        onClick={addCategory}
-                        className="inline-flex h-9 items-center justify-center rounded-xl bg-secondary px-3 text-sm font-medium text-secondary-foreground"
-                      >
-                        新增
-                      </button>
-                    </div>
-                  </div>
+                {/* Always visible: add new category */}
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCategory(); } }}
+                    className="h-8 flex-1 rounded-xl border border-input bg-background px-3 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    placeholder="新增学科…"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="inline-flex h-8 items-center justify-center rounded-xl bg-secondary px-3 text-xs font-medium text-secondary-foreground disabled:opacity-40"
+                  >
+                    新增
+                  </button>
+                </div>
+                {categoryError ? (
+                  <p className="mt-1 text-xs text-destructive">{categoryError}</p>
                 ) : null}
               </div>
 

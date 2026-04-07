@@ -33,11 +33,24 @@ export async function POST(request: Request) {
     const name = body.name?.trim();
     if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
 
-    const { data, error } = await admin
+    // Try inserting with family_id; if the column doesn't exist, retry without
+    let data: { id: string; name: string } | null = null;
+    let error: { message: string } | null = null;
+
+    ({ data, error } = await admin
       .from("resource_categories")
       .insert({ family_id: familyId, name })
       .select("id, name")
-      .single();
+      .single() as any);
+
+    if (error?.message?.includes("family_id")) {
+      // Column doesn't exist — insert without it
+      ({ data, error } = await admin
+        .from("resource_categories")
+        .insert({ name })
+        .select("id, name")
+        .single() as any);
+    }
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, category: data });
