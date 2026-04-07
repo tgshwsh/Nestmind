@@ -22,7 +22,9 @@ async function getAuthedFamily(request: Request) {
     : null;
 }
 
-/** DELETE /api/resources/[id] */
+/** DELETE /api/resources/[id]
+ *  Deletes the resource AND all schedules that reference it.
+ */
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> }
@@ -44,8 +46,19 @@ export async function DELETE(
       .maybeSingle();
     if (!res) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-    const { error } = await admin.from("resources").delete().eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Delete all schedules that reference this resource
+    const { error: schedErr } = await admin
+      .from("schedules")
+      .delete()
+      .eq("resource_id", id);
+    if (schedErr) return NextResponse.json({ error: schedErr.message }, { status: 500 });
+
+    // Delete the resource itself
+    const { error: resErr } = await admin
+      .from("resources")
+      .delete()
+      .eq("id", id);
+    if (resErr) return NextResponse.json({ error: resErr.message }, { status: 500 });
 
     return NextResponse.json({ ok: true });
   } catch (e) {
